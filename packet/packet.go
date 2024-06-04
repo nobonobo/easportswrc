@@ -140,23 +140,40 @@ func (p *Packet) String() string {
 		} else {
 			res.WriteString(", ")
 		}
+		units := ch.Units
+		switch units {
+		case "revolution per minute":
+			units = "[rpm]"
+		case "metre per second":
+			units = "[m/s]"
+		case "metre per second squared":
+			units = "[m/s^2]"
+		case "metre":
+			units = "[m]"
+		case "second":
+			units = "[s]"
+		case "degree Celsius":
+			units = "[deg]"
+		case "uid", "count":
+			units = ""
+		}
 		switch ch.Type {
 		default:
 			return fmt.Sprintf("unknown type %s", ch.Type)
 		case "boolean":
 			res.WriteString(fmt.Sprintf("%s:%t", v.Key, v.Value))
 		case "float32":
-			res.WriteString(fmt.Sprintf("%s:%f", v.Key, v.Value.(float32)))
+			res.WriteString(fmt.Sprintf("%s:%f%s", v.Key, v.Value.(float32), units))
 		case "float64":
-			res.WriteString(fmt.Sprintf("%s:%f", v.Key, v.Value.(float64)))
+			res.WriteString(fmt.Sprintf("%s:%f%s", v.Key, v.Value.(float64), units))
 		case "fourcc":
 			res.WriteString(fmt.Sprintf("%s:%s", v.Key, v.Value.(string)))
 		case "uint8":
-			res.WriteString(fmt.Sprintf("%s:%d", v.Key, v.Value.(uint8)))
+			res.WriteString(fmt.Sprintf("%s:%d%s", v.Key, v.Value.(uint8), units))
 		case "uint16":
-			res.WriteString(fmt.Sprintf("%s:%d", v.Key, v.Value.(uint16)))
+			res.WriteString(fmt.Sprintf("%s:%d%s", v.Key, v.Value.(uint16), units))
 		case "uint64":
-			res.WriteString(fmt.Sprintf("%s:%d", v.Key, v.Value.(uint64)))
+			res.WriteString(fmt.Sprintf("%s:%d%s", v.Key, v.Value.(uint64), units))
 		}
 	}
 	return res.String()
