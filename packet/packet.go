@@ -114,6 +114,10 @@ func New() *Packet {
 	return &Packet{}
 }
 
+func (p *Packet) Length() int {
+	return packetSize
+}
+
 func (p *Packet) String() string {
 	res := strings.Builder{}
 	first := true
@@ -192,14 +196,14 @@ func (p *Packet) MarshalBinary() ([]byte, error) {
 		}
 	}
 	if len(res) != packetSize {
-		return nil, fmt.Errorf("invalid packet size %d", len(res))
+		return nil, fmt.Errorf("invalid packet size %d expected: %d", len(res), packetSize)
 	}
 	return res, nil
 }
 
 func (p *Packet) UnmarshalBinary(b []byte) error {
 	if len(b) != packetSize {
-		return fmt.Errorf("invalid packet size %d", len(b))
+		return fmt.Errorf("invalid packet size %d expected: %d", len(b), packetSize)
 	}
 	reader := bytes.NewReader(b)
 	buf := make([]byte, 8)
