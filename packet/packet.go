@@ -27,7 +27,7 @@ var (
 	WrcRoot      string
 	IdDicts      = &IDs{}
 	ChannelDicts = ChannelTable{}
-	packetConfig = &PacketsDef{}
+	definitions  = &Definitions{}
 	values       = []*KeyValue{}
 	keys         = map[string]*KeyValue{}
 	packetSize   = -1
@@ -38,7 +38,7 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	WrcRoot = os.ExpandEnv(filepath.Join(doc, "My Games", "WRC", "telemetry"))
+	WrcRoot = filepath.Join(doc, "My Games", "WRC", "telemetry")
 	if _, err := os.Stat(WrcRoot); err != nil {
 		log.Fatal(err)
 	}
@@ -60,14 +60,23 @@ func init() {
 	for _, ch := range chdefs.Channels {
 		ChannelDicts[ch.ID] = ch
 	}
-	pb, err := os.ReadFile(filepath.Join(WrcRoot, "readme", "udp", "wrc.json"))
+	conf, err := os.ReadFile(filepath.Join(WrcRoot, "config.json"))
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := json.Unmarshal(pb, &packetConfig); err != nil {
+	var config *Config
+	if err := json.Unmarshal(conf, &config); err != nil {
 		log.Fatal(err)
 	}
-	template := packetConfig.Packets[0].Channels
+	name := config.UDP.Packets[0].Structure
+	pb, err := os.ReadFile(filepath.Join(WrcRoot, "udp", name+".json"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := json.Unmarshal(pb, &definitions); err != nil {
+		log.Fatal(err)
+	}
+	template := definitions.Packets[0].Channels
 	sz := 0
 	for _, key := range template {
 		channel, ok := ChannelDicts[key]
