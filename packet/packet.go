@@ -24,13 +24,20 @@ type KeyValue struct {
 type Packet struct{}
 
 var (
-	WrcRoot      string
-	IdDicts      = &IDs{}
-	ChannelDicts = ChannelTable{}
-	definitions  = &Definitions{}
-	values       = []*KeyValue{}
-	keys         = map[string]*KeyValue{}
-	packetSize   = -1
+	WrcRoot              string
+	ChannelDicts         = ChannelTable{}
+	definitions          = &Definitions{}
+	values               = []*KeyValue{}
+	keys                 = map[string]*KeyValue{}
+	packetSize           = -1
+	gameMode             = map[uint8]string{}
+	locations            = map[uint16]string{}
+	routes               = map[uint16]string{}
+	vehicles             = map[uint16]string{}
+	vehicleClasses       = map[uint16]string{}
+	vehicleManufacturers = map[uint16]string{}
+	vehicleTyreStates    = map[uint8]string{}
+	stageResultStatus    = map[uint8]string{}
 )
 
 func init() {
@@ -46,8 +53,33 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := json.Unmarshal(ib, &IdDicts); err != nil {
+	idjson := &IDs{}
+	if err := json.Unmarshal(ib, &idjson); err != nil {
 		log.Fatal(err)
+	}
+	for _, v := range idjson.GameMode {
+		gameMode[uint8(v.ID)] = v.Name
+	}
+	for _, v := range idjson.Locations {
+		locations[uint16(v.ID)] = v.Name
+	}
+	for _, v := range idjson.Routes {
+		routes[uint16(v.ID)] = v.Name
+	}
+	for _, v := range idjson.Vehicles {
+		vehicles[uint16(v.ID)] = v.Name
+	}
+	for _, v := range idjson.VehicleClasses {
+		vehicleClasses[uint16(v.ID)] = v.Name
+	}
+	for _, v := range idjson.VehicleManufacturers {
+		vehicleManufacturers[uint16(v.ID)] = v.Name
+	}
+	for _, v := range idjson.VehicleTyreState {
+		vehicleTyreStates[uint8(v.ID)] = v.Name
+	}
+	for _, v := range idjson.StageResultStatus {
+		stageResultStatus[uint8(v.ID)] = v.Name
 	}
 	cb, err := os.ReadFile(filepath.Join(WrcRoot, "readme", "channels.json"))
 	if err != nil {
@@ -300,4 +332,108 @@ func (p *Packet) Set(key string, value any) error {
 	}
 	v.Value = value
 	return nil
+}
+
+func (p *Packet) GameMode() string {
+	v, err := p.Get("game_mode")
+	if err != nil {
+		return "Unknown"
+	}
+	s, ok := gameMode[v.(uint8)]
+	if !ok {
+		return "Unknown"
+	}
+	return s
+}
+
+func (p *Packet) Location() string {
+	v, err := p.Get("location_id")
+	if err != nil {
+		return "Unknown"
+	}
+	s, ok := locations[v.(uint16)]
+	if !ok {
+		return "Unknown"
+	}
+	return s
+}
+
+func (p *Packet) Route() string {
+	v, err := p.Get("route_id")
+	if err != nil {
+		return "Unknown"
+	}
+	s, ok := routes[v.(uint16)]
+	if !ok {
+		return "Unknown"
+	}
+	return s
+}
+
+func (p *Packet) Vehicle() string {
+	v, err := p.Get("vehicle_id")
+	if err != nil {
+		return "Unknown"
+	}
+	s, ok := vehicles[v.(uint16)]
+	if !ok {
+		return "Unknown"
+	}
+	return s
+}
+
+func (p *Packet) VehicleClass() string {
+	v, err := p.Get("vehicle_class_id")
+	if err != nil {
+		return "Unknown"
+	}
+	s, ok := vehicleClasses[v.(uint16)]
+	if !ok {
+		return "Unknown"
+	}
+	return s
+}
+func (p *Packet) VehicleManufacturer() string {
+	v, err := p.Get("vehicle_manufacturer_id")
+	if err != nil {
+		return "Unknown"
+	}
+	s, ok := vehicleManufacturers[v.(uint16)]
+	if !ok {
+		return "Unknown"
+	}
+	return s
+}
+
+type Position string
+
+const (
+	ForwardLeft   Position = "_fl"
+	ForwardRight  Position = "_fr"
+	BackwordLeft  Position = "_bl"
+	BackwordRight Position = "_br"
+)
+
+func (p *Packet) VehicleTyreState(pos Position) string {
+	v, err := p.Get("vehicle_tyre_state" + string(pos))
+	if err != nil {
+		return "Unknown"
+	}
+	s, ok := vehicleTyreStates[v.(uint8)]
+	if !ok {
+		return "Unknown"
+	}
+	return s
+}
+
+func (p *Packet) StageResultStatus() string {
+	v, err := p.Get("stage_result_status")
+	if err != nil {
+		return "Unknown"
+	}
+	s, ok := stageResultStatus[v.(uint8)]
+	if !ok {
+		return "Unknown"
+	}
+	return s
 }
