@@ -3,65 +3,121 @@ package packet
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
+	"log"
 	"math"
+	"os"
+	"path/filepath"
 	"strings"
+
+	"golang.org/x/sys/windows"
 )
+
+type ChannelTable map[string]*Channel
 
 type KeyValue struct {
 	Key   string
 	Value any
 }
 
-type Packet struct {
-	values []*KeyValue
-	keys   map[string]*KeyValue
-}
+type Packet struct{}
 
-func Make() (*Packet, error) {
-	template := packetConfig.Packets[0].Channels
-	p := &Packet{
-		values: []*KeyValue{},
-		keys:   make(map[string]*KeyValue),
+var (
+	WrcRoot      string
+	IdDicts      = &IDs{}
+	ChannelDicts = ChannelTable{}
+	packetConfig = &PacketsDef{}
+	values       = []*KeyValue{}
+	keys         = map[string]*KeyValue{}
+	packetSize   = -1
+)
+
+func init() {
+	doc, err := windows.KnownFolderPath(windows.FOLDERID_Documents, 0)
+	if err != nil {
+		log.Fatal(err)
 	}
+	WrcRoot = os.ExpandEnv(filepath.Join(doc, "My Games", "WRC", "telemetry"))
+	if _, err := os.Stat(WrcRoot); err != nil {
+		log.Fatal(err)
+	}
+	ib, err := ReadFileUTF16(filepath.Join(WrcRoot, "readme", "ids.json"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := json.Unmarshal(ib, &IdDicts); err != nil {
+		log.Fatal(err)
+	}
+	cb, err := os.ReadFile(filepath.Join(WrcRoot, "readme", "channels.json"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	var chdefs *ChannelsDef
+	if err := json.Unmarshal(cb, &chdefs); err != nil {
+		log.Fatal(err)
+	}
+	for _, ch := range chdefs.Channels {
+		ChannelDicts[ch.ID] = ch
+	}
+	pb, err := os.ReadFile(filepath.Join(WrcRoot, "readme", "udp", "wrc.json"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := json.Unmarshal(pb, &packetConfig); err != nil {
+		log.Fatal(err)
+	}
+	template := packetConfig.Packets[0].Channels
+	sz := 0
 	for _, key := range template {
 		channel, ok := ChannelDicts[key]
 		if !ok {
-			return nil, fmt.Errorf("channel %s not found", key)
+			log.Fatal(fmt.Errorf("channel %s not found", key))
 		}
 		var value any
 		switch channel.Type {
 		default:
-			return nil, fmt.Errorf("type %s not found", channel.Type)
+			log.Fatal(fmt.Errorf("type %s not found", channel.Type))
 		case "boolean":
 			value = false
+			sz += 1
 		case "float32":
 			value = float32(0.0)
+			sz += 4
 		case "float64":
 			value = 0.0
+			sz += 8
 		case "fourcc":
 			value = "____"
+			sz += 4
 		case "uint8":
 			value = uint8(0)
+			sz += 1
 		case "uint16":
 			value = uint16(0)
+			sz += 2
 		case "uint64":
 			value = uint64(0)
+			sz += 8
 		}
 		kv := &KeyValue{
 			Key:   key,
 			Value: value,
 		}
-		p.values = append(p.values, kv)
-		p.keys[key] = kv
+		values = append(values, kv)
+		keys[key] = kv
 	}
-	return p, nil
+	packetSize = sz
+}
+
+func New() *Packet {
+	return &Packet{}
 }
 
 func (p *Packet) String() string {
 	res := strings.Builder{}
 	first := true
-	for _, v := range p.values {
+	for _, v := range values {
 		ch, ok := ChannelDicts[v.Key]
 		if !ok {
 			return fmt.Sprintf("unknown channel %s", v.Key)
@@ -75,12 +131,7 @@ func (p *Packet) String() string {
 		default:
 			return fmt.Sprintf("unknown type %s", ch.Type)
 		case "boolean":
-			res.WriteString(fmt.Sprintf("%s:", v.Key))
-			if v.Value.(bool) {
-				res.WriteString("1")
-			} else {
-				res.WriteString("0")
-			}
+			res.WriteString(fmt.Sprintf("%s:%t", v.Key, v.Value))
 		case "float32":
 			res.WriteString(fmt.Sprintf("%s:%f", v.Key, v.Value.(float32)))
 		case "float64":
@@ -100,7 +151,7 @@ func (p *Packet) String() string {
 
 func (p *Packet) MarshalBinary() ([]byte, error) {
 	res := []byte{}
-	for _, v := range p.values {
+	for _, v := range values {
 		ch, ok := ChannelDicts[v.Key]
 		if !ok {
 			return nil, fmt.Errorf("unknown channel %s", v.Key)
@@ -140,13 +191,19 @@ func (p *Packet) MarshalBinary() ([]byte, error) {
 			)
 		}
 	}
-	return nil, nil
+	if len(res) != packetSize {
+		return nil, fmt.Errorf("invalid packet size %d", len(res))
+	}
+	return res, nil
 }
 
 func (p *Packet) UnmarshalBinary(b []byte) error {
+	if len(b) != packetSize {
+		return fmt.Errorf("invalid packet size %d", len(b))
+	}
 	reader := bytes.NewReader(b)
 	buf := make([]byte, 8)
-	for _, v := range p.values {
+	for _, v := range values {
 		ch, ok := ChannelDicts[v.Key]
 		if !ok {
 			return fmt.Errorf("unknown channel %s", v.Key)
@@ -199,7 +256,7 @@ func (p *Packet) UnmarshalBinary(b []byte) error {
 }
 
 func (p *Packet) Get(key string) (any, error) {
-	v, ok := p.keys[key]
+	v, ok := keys[key]
 	if !ok {
 		return nil, fmt.Errorf("key %s not found", key)
 	}
@@ -207,7 +264,7 @@ func (p *Packet) Get(key string) (any, error) {
 }
 
 func (p *Packet) Set(key string, value any) error {
-	v, ok := p.keys[key]
+	v, ok := keys[key]
 	if !ok {
 		return fmt.Errorf("key %s not found", key)
 	}
