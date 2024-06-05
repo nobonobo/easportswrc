@@ -176,7 +176,12 @@ func init() {
 		log.Fatal(err)
 	}
 	name := config.UDP.Packets[0].Structure
-	pb, err := os.ReadFile(filepath.Join(WrcRoot, "telemetry", "udp", name+".json"))
+	fpath := filepath.Join(WrcRoot, "telemetry", "udp", name+".json")
+	switch name {
+	case "wrc", "wrc_experimental":
+		fpath = filepath.Join(WrcRoot, "telemetry", "readme", "udp", name+".json")
+	}
+	pb, err := os.ReadFile(fpath)
 	if err != nil {
 		log.Fatal(err)
 	}
