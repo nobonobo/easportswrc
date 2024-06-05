@@ -6,29 +6,99 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"golang.org/x/sys/windows"
 )
 
 type ChannelTable map[string]*Channel
 
-type KeyValue struct {
-	Key   string
-	Value any
+type Packet struct {
+	Packet4CC                 [4]byte `json:"packet_4cc"`
+	PacketUID                 uint64  `json:"packet_uid"`
+	ShiftlightsFraction       float32 `json:"shiftlights_fraction"`
+	ShiftlightsRpmStart       float32 `json:"shiftlights_rpm_start"`
+	ShiftlightsRpmEnd         float32 `json:"shiftlights_rpm_end"`
+	ShiftlightsRpmValid       bool    `json:"shiftlights_rpm_valid"`
+	VehicleGearIndex          uint8   `json:"vehicle_gear_index"`
+	VehicleGearIndexNeutral   uint8   `json:"vehicle_gear_index_neutral"`
+	VehicleGearIndexReverse   uint8   `json:"vehicle_gear_index_reverse"`
+	VehicleGearMaximum        uint8   `json:"vehicle_gear_maximum"`
+	VehicleSpeed              float32 `json:"vehicle_speed"`
+	VehicleTransmissionSpeed  float32 `json:"vehicle_transmission_speed"`
+	VehiclePositionX          float32 `json:"VehiclePositionX"`
+	VehiclePositionY          float32 `json:"vehicle_position_y"`
+	VehiclePositionZ          float32 `json:"vehicle_position_z"`
+	VehicleVelocityX          float32 `json:"vehicle_velocity_x"`
+	VehicleVelocityY          float32 `json:"vehicle_velocity_y"`
+	VehicleVelocityZ          float32 `json:"vehicle_velocity_z"`
+	VehicleAccelerationX      float32 `json:"vehicle_acceleration_x"`
+	VehicleAccelerationY      float32 `json:"vehicle_acceleration_y"`
+	VehicleAccelerationZ      float32 `json:"vehicle_acceleration_z"`
+	VehicleLeftDirectionX     float32 `json:"vehicle_left_direction_x"`
+	VehicleLeftDirectionY     float32 `json:"vehicle_left_direction_y"`
+	VehicleLeftDirectionZ     float32 `json:"vehicle_left_direction_z"`
+	VehicleForwardDirectionX  float32 `json:"vehicle_forward_direction_x"`
+	VehicleForwardDirectionY  float32 `json:"vehicle_forward_direction_y"`
+	VehicleForwardDirectionZ  float32 `json:"vehicle_forward_direction_z"`
+	VehicleUpDirectionX       float32 `json:"vehicle_up_direction_x"`
+	VehicleUpDirectionY       float32 `json:"vehicle_up_direction_y"`
+	VehicleUpDirectionZ       float32 `json:"vehicle_up_direction_z"`
+	VehicleHubPositionBl      float32 `json:"vehicle_hub_position_bl"`
+	VehicleHubPositionBr      float32 `json:"vehicle_hub_position_br"`
+	VehicleHubPositionFl      float32 `json:"vehicle_hub_position_fl"`
+	VehicleHubPositionFr      float32 `json:"vehicle_hub_position_fr"`
+	VehicleHubVelocityBl      float32 `json:"vehicle_hub_velocity_bl"`
+	VehicleHubVelocityBr      float32 `json:"vehicle_hub_velocity_br"`
+	VehicleHubVelocityFl      float32 `json:"vehicle_hub_velocity_fl"`
+	VehicleHubVelocityFr      float32 `json:"vehicle_hub_velocity_fr"`
+	VehicleCpForwardSpeedBl   float32 `json:"vehicle_cp_forward_speed_bl"`
+	VehicleCpForwardSpeedBr   float32 `json:"vehicle_cp_forward_speed_br"`
+	VehicleCpForwardSpeedFl   float32 `json:"vehicle_cp_forward_speed_fl"`
+	VehicleCpForwardSpeedFr   float32 `json:"vehicle_cp_forward_speed_fr"`
+	VehicleBrakeTemperatureBl float32 `json:"vehicle_brake_temperature_bl"`
+	VehicleBrakeTemperatureBr float32 `json:"vehicle_brake_temperature_br"`
+	VehicleBrakeTemperatureFl float32 `json:"vehicle_brake_temperature_fl"`
+	VehicleBrakeTemperatureFr float32 `json:"vehicle_brake_temperature_fr"`
+	VehicleEngineRpmMax       float32 `json:"vehicle_engine_rpm_max"`
+	VehicleEngineRpmIdle      float32 `json:"vehicle_engine_rpm_idle"`
+	VehicleEngineRpmCurrent   float32 `json:"vehicle_engine_rpm_current"`
+	VehicleThrottle           float32 `json:"vehicle_throttle"`
+	VehicleBrake              float32 `json:"vehicle_brake"`
+	VehicleClutch             float32 `json:"vehicle_clutch"`
+	VehicleSteering           float32 `json:"vehicle_steering"`
+	VehicleHandbrake          float32 `json:"vehicle_handbrake"`
+	GameTotalTime             float32 `json:"game_total_time"`
+	GameDeltaTime             float32 `json:"game_delta_time"`
+	GameFrameCount            uint64  `json:"game_frame_count"`
+	StageCurrentTime          float32 `json:"stage_current_time"`
+	StagePreviousSplitTime    float32 `json:"stage_previous_split_time"`
+	StageResultTime           float32 `json:"stage_result_time"`
+	StageResultTimePenalty    float32 `json:"stage_result_time_penalty"`
+	StageResultStatus         uint8   `json:"stage_result_status"`
+	StageCurrentDistance      float32 `json:"stage_current_distance"`
+	StageLength               float32 `json:"stage_length"`
+	StageProgress             float32 `json:"stage_progress"`
+	VehicleTyreStateBl        uint8   `json:"vehicle_tyre_state_bl"`
+	VehicleTyreStateBr        uint8   `json:"vehicle_tyre_state_br"`
+	VehicleTyreStateFl        uint8   `json:"vehicle_tyre_state_fl"`
+	VehicleTyreStateFr        uint8   `json:"vehicle_tyre_state_fr"`
+	StageShakedown            bool    `json:"stage_shakedown"`
+	GameMode                  uint8   `json:"game_mode"`
+	VehicleID                 uint16  `json:"vehicle_id"`
+	VehicleClassID            uint16  `json:"vehicle_class_id"`
+	VehicleManufacturerID     uint16  `json:"vehicle_manufacturer_id"`
+	LocationID                uint16  `json:"location_id"`
+	RouteID                   uint16  `json:"route_id"`
+	VehicleClusterAbs         bool    `json:"vehicle_cluster_abs"`
 }
-
-type Packet struct{}
 
 var (
 	WrcRoot              string
 	ChannelDicts         = ChannelTable{}
 	definitions          = &Definitions{}
-	values               = []*KeyValue{}
-	keys                 = map[string]*KeyValue{}
+	templates            = []string{}
 	packetSize           = -1
 	gameMode             = map[uint8]string{}
 	locations            = map[uint16]string{}
@@ -38,6 +108,7 @@ var (
 	vehicleManufacturers = map[uint16]string{}
 	vehicleTyreStates    = map[uint8]string{}
 	stageResultStatus    = map[uint8]string{}
+	endian               = binary.LittleEndian
 )
 
 func init() {
@@ -108,45 +179,31 @@ func init() {
 	if err := json.Unmarshal(pb, &definitions); err != nil {
 		log.Fatal(err)
 	}
-	template := definitions.Packets[0].Channels
+	templates = definitions.Packets[0].Channels
 	sz := 0
-	for _, key := range template {
+	for _, key := range templates {
 		channel, ok := ChannelDicts[key]
 		if !ok {
 			log.Fatal(fmt.Errorf("channel %s not found", key))
 		}
-		var value any
 		switch channel.Type {
 		default:
 			log.Fatal(fmt.Errorf("type %s not found", channel.Type))
 		case "boolean":
-			value = false
 			sz += 1
 		case "float32":
-			value = float32(0.0)
 			sz += 4
 		case "float64":
-			value = 0.0
 			sz += 8
 		case "fourcc":
-			value = "____"
 			sz += 4
 		case "uint8":
-			value = uint8(0)
 			sz += 1
 		case "uint16":
-			value = uint16(0)
 			sz += 2
 		case "uint64":
-			value = uint64(0)
 			sz += 8
 		}
-		kv := &KeyValue{
-			Key:   key,
-			Value: value,
-		}
-		values = append(values, kv)
-		keys[key] = kv
 	}
 	packetSize = sz
 }
@@ -160,103 +217,191 @@ func (p *Packet) Length() int {
 }
 
 func (p *Packet) String() string {
-	res := strings.Builder{}
-	first := true
-	for _, v := range values {
-		ch, ok := ChannelDicts[v.Key]
-		if !ok {
-			return fmt.Sprintf("unknown channel %s", v.Key)
-		}
-		if first {
-			first = false
-		} else {
-			res.WriteString(", ")
-		}
-		units := ch.Units
-		switch units {
-		case "revolution per minute":
-			units = "[rpm]"
-		case "metre per second":
-			units = "[m/s]"
-		case "metre per second squared":
-			units = "[m/s^2]"
-		case "metre":
-			units = "[m]"
-		case "second":
-			units = "[s]"
-		case "degree Celsius":
-			units = "[deg]"
-		case "uid", "count":
-			units = ""
-		}
-		switch ch.Type {
-		default:
-			return fmt.Sprintf("unknown type %s", ch.Type)
-		case "boolean":
-			res.WriteString(fmt.Sprintf("%s:%t", v.Key, v.Value))
-		case "float32":
-			res.WriteString(fmt.Sprintf("%s:%f%s", v.Key, v.Value.(float32), units))
-		case "float64":
-			res.WriteString(fmt.Sprintf("%s:%f%s", v.Key, v.Value.(float64), units))
-		case "fourcc":
-			res.WriteString(fmt.Sprintf("%s:%s", v.Key, v.Value.(string)))
-		case "uint8":
-			res.WriteString(fmt.Sprintf("%s:%d%s", v.Key, v.Value.(uint8), units))
-		case "uint16":
-			res.WriteString(fmt.Sprintf("%s:%d%s", v.Key, v.Value.(uint16), units))
-		case "uint64":
-			res.WriteString(fmt.Sprintf("%s:%d%s", v.Key, v.Value.(uint64), units))
-		}
-	}
-	return res.String()
+	return fmt.Sprintf("%v", *p)
+}
+
+func (p *Packet) Fields() []string {
+	return templates
 }
 
 func (p *Packet) MarshalBinary() ([]byte, error) {
-	res := []byte{}
-	for _, v := range values {
-		ch, ok := ChannelDicts[v.Key]
-		if !ok {
-			return nil, fmt.Errorf("unknown channel %s", v.Key)
-		}
-		switch ch.Type {
+	writer := bytes.NewBuffer(nil)
+	for _, v := range templates {
+		switch v {
 		default:
-			return nil, fmt.Errorf("unknown type %s", ch.Type)
-		case "boolean":
-			if v.Value.(bool) {
-				res = append(res, 1)
+			return nil, fmt.Errorf("unknown field %s", v)
+		case "packet_4cc":
+			binary.Write(writer, endian, p.Packet4CC)
+		case "packet_uid":
+			binary.Write(writer, endian, p.PacketUID)
+		case "shiftlights_fraction":
+			binary.Write(writer, endian, p.ShiftlightsFraction)
+		case "shiftlights_rpm_start":
+			binary.Write(writer, endian, p.ShiftlightsRpmStart)
+		case "shiftlights_rpm_end":
+			binary.Write(writer, endian, p.ShiftlightsRpmEnd)
+		case "shiftlights_rpm_valid":
+			if p.ShiftlightsRpmValid {
+				writer.Write([]byte{1})
 			} else {
-				res = append(res, 0)
+				writer.Write([]byte{0})
 			}
-		case "float32":
-			res = binary.LittleEndian.AppendUint32(
-				res,
-				math.Float32bits(v.Value.(float32)),
-			)
-		case "float64":
-			res = binary.LittleEndian.AppendUint64(
-				res,
-				math.Float64bits(v.Value.(float64)),
-			)
-		case "fourcc":
-			res = append(res, v.Value.(string)[0:4]...)
-		case "uint8":
-			res = append(res, v.Value.(uint8))
-		case "uint16":
-			res = binary.LittleEndian.AppendUint16(
-				res,
-				v.Value.(uint16),
-			)
-		case "uint64":
-			res = binary.LittleEndian.AppendUint64(
-				res,
-				v.Value.(uint64),
-			)
+		case "vehicle_gear_index":
+			binary.Write(writer, endian, p.VehicleGearIndex)
+		case "vehicle_gear_index_neutral":
+			binary.Write(writer, endian, p.VehicleGearIndexNeutral)
+		case "vehicle_gear_index_reverse":
+			binary.Write(writer, endian, p.VehicleGearIndexReverse)
+		case "vehicle_gear_maximum":
+			binary.Write(writer, endian, p.VehicleGearMaximum)
+		case "vehicle_speed":
+			binary.Write(writer, endian, p.VehicleSpeed)
+		case "vehicle_transmission_speed":
+			binary.Write(writer, endian, p.VehicleTransmissionSpeed)
+		case "vehicle_position_x":
+			binary.Write(writer, endian, p.VehiclePositionX)
+		case "vehicle_position_y":
+			binary.Write(writer, endian, p.VehiclePositionY)
+		case "vehicle_position_z":
+			binary.Write(writer, endian, p.VehiclePositionZ)
+		case "vehicle_velocity_x":
+			binary.Write(writer, endian, p.VehicleVelocityX)
+		case "vehicle_velocity_y":
+			binary.Write(writer, endian, p.VehicleVelocityY)
+		case "vehicle_velocity_z":
+			binary.Write(writer, endian, p.VehicleVelocityZ)
+		case "vehicle_acceleration_x":
+			binary.Write(writer, endian, p.VehicleAccelerationX)
+		case "vehicle_acceleration_y":
+			binary.Write(writer, endian, p.VehicleAccelerationY)
+		case "vehicle_acceleration_z":
+			binary.Write(writer, endian, p.VehicleAccelerationZ)
+		case "vehicle_left_direction_x":
+			binary.Write(writer, endian, p.VehicleLeftDirectionX)
+		case "vehicle_left_direction_y":
+			binary.Write(writer, endian, p.VehicleLeftDirectionY)
+		case "vehicle_left_direction_z":
+			binary.Write(writer, endian, p.VehicleLeftDirectionZ)
+		case "vehicle_forward_direction_x":
+			binary.Write(writer, endian, p.VehicleForwardDirectionX)
+		case "vehicle_forward_direction_y":
+			binary.Write(writer, endian, p.VehicleForwardDirectionY)
+		case "vehicle_forward_direction_z":
+			binary.Write(writer, endian, p.VehicleForwardDirectionZ)
+		case "vehicle_up_direction_x":
+			binary.Write(writer, endian, p.VehicleUpDirectionX)
+		case "vehicle_up_direction_y":
+			binary.Write(writer, endian, p.VehicleUpDirectionY)
+		case "vehicle_up_direction_z":
+			binary.Write(writer, endian, p.VehicleUpDirectionZ)
+		case "vehicle_hub_position_bl":
+			binary.Write(writer, endian, p.VehicleHubPositionBl)
+		case "vehicle_hub_position_br":
+			binary.Write(writer, endian, p.VehicleHubPositionBr)
+		case "vehicle_hub_position_fl":
+			binary.Write(writer, endian, p.VehicleHubPositionFl)
+		case "vehicle_hub_position_fr":
+			binary.Write(writer, endian, p.VehicleHubPositionFr)
+		case "vehicle_hub_velocity_bl":
+			binary.Write(writer, endian, p.VehicleHubVelocityBl)
+		case "vehicle_hub_velocity_br":
+			binary.Write(writer, endian, p.VehicleHubVelocityBr)
+		case "vehicle_hub_velocity_fl":
+			binary.Write(writer, endian, p.VehicleHubVelocityFl)
+		case "vehicle_hub_velocity_fr":
+			binary.Write(writer, endian, p.VehicleHubVelocityFr)
+		case "vehicle_cp_forward_speed_bl":
+			binary.Write(writer, endian, p.VehicleCpForwardSpeedBl)
+		case "vehicle_cp_forward_speed_br":
+			binary.Write(writer, endian, p.VehicleCpForwardSpeedBr)
+		case "vehicle_cp_forward_speed_fl":
+			binary.Write(writer, endian, p.VehicleCpForwardSpeedFl)
+		case "vehicle_cp_forward_speed_fr":
+			binary.Write(writer, endian, p.VehicleCpForwardSpeedFr)
+		case "vehicle_brake_temperature_bl":
+			binary.Write(writer, endian, p.VehicleBrakeTemperatureBl)
+		case "vehicle_brake_temperature_br":
+			binary.Write(writer, endian, p.VehicleBrakeTemperatureBr)
+		case "vehicle_brake_temperature_fl":
+			binary.Write(writer, endian, p.VehicleBrakeTemperatureFl)
+		case "vehicle_brake_temperature_fr":
+			binary.Write(writer, endian, p.VehicleBrakeTemperatureFr)
+		case "vehicle_engine_rpm_max":
+			binary.Write(writer, endian, p.VehicleEngineRpmMax)
+		case "vehicle_engine_rpm_idle":
+			binary.Write(writer, endian, p.VehicleEngineRpmIdle)
+		case "vehicle_engine_rpm_current":
+			binary.Write(writer, endian, p.VehicleEngineRpmCurrent)
+		case "vehicle_throttle":
+			binary.Write(writer, endian, p.VehicleThrottle)
+		case "vehicle_brake":
+			binary.Write(writer, endian, p.VehicleBrake)
+		case "vehicle_clutch":
+			binary.Write(writer, endian, p.VehicleClutch)
+		case "vehicle_steering":
+			binary.Write(writer, endian, p.VehicleSteering)
+		case "vehicle_handbrake":
+			binary.Write(writer, endian, p.VehicleHandbrake)
+		case "game_total_time":
+			binary.Write(writer, endian, p.GameTotalTime)
+		case "game_delta_time":
+			binary.Write(writer, endian, p.GameDeltaTime)
+		case "game_frame_count":
+			binary.Write(writer, endian, p.GameFrameCount)
+		case "stage_current_time":
+			binary.Write(writer, endian, p.StageCurrentTime)
+		case "stage_previous_split_time":
+			binary.Write(writer, endian, p.StagePreviousSplitTime)
+		case "stage_result_time":
+			binary.Write(writer, endian, p.StageResultTime)
+		case "stage_result_time_penalty":
+			binary.Write(writer, endian, p.StageResultTimePenalty)
+		case "stage_result_status":
+			binary.Write(writer, endian, p.StageResultStatus)
+		case "stage_current_distance":
+			binary.Write(writer, endian, p.StageCurrentDistance)
+		case "stage_length":
+			binary.Write(writer, endian, p.StageLength)
+		case "stage_progress":
+			binary.Write(writer, endian, p.StageProgress)
+		case "vehicle_tyre_state_bl":
+			binary.Write(writer, endian, p.VehicleTyreStateBl)
+		case "vehicle_tyre_state_br":
+			binary.Write(writer, endian, p.VehicleTyreStateBr)
+		case "vehicle_tyre_state_fl":
+			binary.Write(writer, endian, p.VehicleTyreStateFl)
+		case "vehicle_tyre_state_fr":
+			binary.Write(writer, endian, p.VehicleTyreStateFr)
+		case "stage_shakedown":
+			if p.StageShakedown {
+				writer.Write([]byte{1})
+			} else {
+				writer.Write([]byte{0})
+			}
+		case "game_mode":
+			binary.Write(writer, endian, p.GameMode)
+		case "vehicle_id":
+			binary.Write(writer, endian, p.VehicleID)
+		case "vehicle_class_id":
+			binary.Write(writer, endian, p.VehicleClassID)
+		case "vehicle_manufacturer_id":
+			binary.Write(writer, endian, p.VehicleManufacturerID)
+		case "location_id":
+			binary.Write(writer, endian, p.LocationID)
+		case "route_id":
+			binary.Write(writer, endian, p.RouteID)
+		case "vehicle_cluster_abs":
+			if p.VehicleClusterAbs {
+				writer.Write([]byte{1})
+			} else {
+				writer.Write([]byte{0})
+			}
 		}
 	}
-	if len(res) != packetSize {
-		return nil, fmt.Errorf("invalid packet size %d expected: %d", len(res), packetSize)
+	if writer.Len() != packetSize {
+		return nil, fmt.Errorf("invalid packet size %d expected: %d", writer.Len(), packetSize)
 	}
-	return res, nil
+	return writer.Bytes(), nil
 }
 
 func (p *Packet) UnmarshalBinary(b []byte) error {
@@ -264,143 +409,228 @@ func (p *Packet) UnmarshalBinary(b []byte) error {
 		return fmt.Errorf("invalid packet size %d expected: %d", len(b), packetSize)
 	}
 	reader := bytes.NewReader(b)
-	buf := make([]byte, 8)
-	for _, v := range values {
-		ch, ok := ChannelDicts[v.Key]
-		if !ok {
-			return fmt.Errorf("unknown channel %s", v.Key)
-		}
-		switch ch.Type {
+	buf := []byte{0}
+	for _, v := range templates {
+		var err error
+		var n int
+		switch v {
 		default:
-			return fmt.Errorf("unknown type %s", ch.Type)
-		case "boolean":
-			if _, err := reader.Read(buf[0:1]); err != nil {
-				return err
+			return fmt.Errorf("unknown field %s", v)
+		case "packet_4cc":
+			err = binary.Read(reader, binary.LittleEndian, &p.Packet4CC)
+		case "packet_uid":
+			err = binary.Read(reader, binary.LittleEndian, &p.PacketUID)
+		case "shiftlights_fraction":
+			err = binary.Read(reader, binary.LittleEndian, &p.ShiftlightsFraction)
+		case "shiftlights_rpm_start":
+			err = binary.Read(reader, binary.LittleEndian, &p.ShiftlightsRpmStart)
+		case "shiftlights_rpm_end":
+			err = binary.Read(reader, binary.LittleEndian, &p.ShiftlightsRpmEnd)
+		case "shiftlights_rpm_valid":
+			n, err = reader.Read(buf)
+			if n > 0 {
+				p.ShiftlightsRpmValid = buf[0] != 0
 			}
-			v.Value = buf[0] != 0
-		case "float32":
-			val := uint32(0)
-			if err := binary.Read(reader, binary.LittleEndian, &val); err != nil {
-				return err
+		case "vehicle_gear_index":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleGearIndex)
+		case "vehicle_gear_index_neutral":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleGearIndexNeutral)
+		case "vehicle_gear_index_reverse":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleGearIndexReverse)
+		case "vehicle_gear_maximum":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleGearMaximum)
+		case "vehicle_speed":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleSpeed)
+		case "vehicle_transmission_speed":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleTransmissionSpeed)
+		case "vehicle_position_x":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehiclePositionX)
+		case "vehicle_position_y":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehiclePositionY)
+		case "vehicle_position_z":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehiclePositionZ)
+		case "vehicle_velocity_x":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleVelocityX)
+		case "vehicle_velocity_y":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleVelocityY)
+		case "vehicle_velocity_z":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleVelocityZ)
+		case "vehicle_acceleration_x":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleAccelerationX)
+		case "vehicle_acceleration_y":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleAccelerationY)
+		case "vehicle_acceleration_z":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleAccelerationZ)
+		case "vehicle_left_direction_x":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleLeftDirectionX)
+		case "vehicle_left_direction_y":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleLeftDirectionY)
+		case "vehicle_left_direction_z":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleLeftDirectionZ)
+		case "vehicle_forward_direction_x":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleForwardDirectionX)
+		case "vehicle_forward_direction_y":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleForwardDirectionY)
+		case "vehicle_forward_direction_z":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleForwardDirectionZ)
+		case "vehicle_up_direction_x":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleUpDirectionX)
+		case "vehicle_up_direction_y":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleUpDirectionY)
+		case "vehicle_up_direction_z":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleUpDirectionZ)
+		case "vehicle_hub_position_bl":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleHubPositionBl)
+		case "vehicle_hub_position_br":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleHubPositionBr)
+		case "vehicle_hub_position_fl":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleHubPositionFl)
+		case "vehicle_hub_position_fr":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleHubPositionFr)
+		case "vehicle_hub_velocity_bl":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleHubVelocityBl)
+		case "vehicle_hub_velocity_br":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleHubVelocityBr)
+		case "vehicle_hub_velocity_fl":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleHubVelocityFl)
+		case "vehicle_hub_velocity_fr":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleHubVelocityFr)
+		case "vehicle_cp_forward_speed_bl":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleCpForwardSpeedBl)
+		case "vehicle_cp_forward_speed_br":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleCpForwardSpeedBr)
+		case "vehicle_cp_forward_speed_fl":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleCpForwardSpeedFl)
+		case "vehicle_cp_forward_speed_fr":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleCpForwardSpeedFr)
+		case "vehicle_brake_temperature_bl":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleBrakeTemperatureBl)
+		case "vehicle_brake_temperature_br":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleBrakeTemperatureBr)
+		case "vehicle_brake_temperature_fl":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleBrakeTemperatureFl)
+		case "vehicle_brake_temperature_fr":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleBrakeTemperatureFr)
+		case "vehicle_engine_rpm_max":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleEngineRpmMax)
+		case "vehicle_engine_rpm_idle":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleEngineRpmIdle)
+		case "vehicle_engine_rpm_current":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleEngineRpmCurrent)
+		case "vehicle_throttle":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleThrottle)
+		case "vehicle_brake":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleBrake)
+		case "vehicle_clutch":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleClutch)
+		case "vehicle_steering":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleSteering)
+		case "vehicle_handbrake":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleHandbrake)
+		case "game_total_time":
+			err = binary.Read(reader, binary.LittleEndian, &p.GameTotalTime)
+		case "game_delta_time":
+			err = binary.Read(reader, binary.LittleEndian, &p.GameDeltaTime)
+		case "game_frame_count":
+			err = binary.Read(reader, binary.LittleEndian, &p.GameFrameCount)
+		case "stage_current_time":
+			err = binary.Read(reader, binary.LittleEndian, &p.StageCurrentTime)
+		case "stage_previous_split_time":
+			err = binary.Read(reader, binary.LittleEndian, &p.StagePreviousSplitTime)
+		case "stage_result_time":
+			err = binary.Read(reader, binary.LittleEndian, &p.StageResultTime)
+		case "stage_result_time_penalty":
+			err = binary.Read(reader, binary.LittleEndian, &p.StageResultTimePenalty)
+		case "stage_result_status":
+			err = binary.Read(reader, binary.LittleEndian, &p.StageResultStatus)
+		case "stage_current_distance":
+			err = binary.Read(reader, binary.LittleEndian, &p.StageCurrentDistance)
+		case "stage_length":
+			err = binary.Read(reader, binary.LittleEndian, &p.StageLength)
+		case "stage_progress":
+			err = binary.Read(reader, binary.LittleEndian, &p.StageProgress)
+		case "vehicle_tyre_state_bl":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleTyreStateBl)
+		case "vehicle_tyre_state_br":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleTyreStateBr)
+		case "vehicle_tyre_state_fl":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleTyreStateFl)
+		case "vehicle_tyre_state_fr":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleTyreStateFr)
+		case "stage_shakedown":
+			n, err = reader.Read(buf)
+			if n > 0 {
+				p.StageShakedown = buf[0] != 0
 			}
-			v.Value = math.Float32frombits(val)
-		case "float64":
-			val := uint64(0)
-			if err := binary.Read(reader, binary.LittleEndian, &val); err != nil {
-				return err
+		case "game_mode":
+			err = binary.Read(reader, binary.LittleEndian, &p.GameMode)
+		case "vehicle_id":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleID)
+		case "vehicle_class_id":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleClassID)
+		case "vehicle_manufacturer_id":
+			err = binary.Read(reader, binary.LittleEndian, &p.VehicleManufacturerID)
+		case "location_id":
+			err = binary.Read(reader, binary.LittleEndian, &p.LocationID)
+		case "route_id":
+			err = binary.Read(reader, binary.LittleEndian, &p.RouteID)
+		case "vehicle_cluster_abs":
+			n, err = reader.Read(buf)
+			if n > 0 {
+				p.VehicleClusterAbs = buf[0] != 0
 			}
-			v.Value = math.Float64frombits(val)
-		case "fourcc":
-			if _, err := reader.Read(buf[0:4]); err != nil {
-				return err
-			}
-			v.Value = string(buf[0:4])
-		case "uint8":
-			if _, err := reader.Read(buf[0:1]); err != nil {
-				return err
-			}
-			v.Value = buf[0]
-		case "uint16":
-			val := uint16(0)
-			if err := binary.Read(reader, binary.LittleEndian, &val); err != nil {
-				return err
-			}
-			v.Value = val
-		case "uint64":
-			val := uint64(0)
-			if err := binary.Read(reader, binary.LittleEndian, &val); err != nil {
-				return err
-			}
-			v.Value = val
+		}
+		if err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-func (p *Packet) Get(key string) (any, error) {
-	v, ok := keys[key]
+func (p *Packet) GameModeString() string {
+	s, ok := gameMode[p.GameMode]
 	if !ok {
-		return nil, fmt.Errorf("key %s not found", key)
-	}
-	return v.Value, nil
-}
-
-func (p *Packet) Set(key string, value any) error {
-	v, ok := keys[key]
-	if !ok {
-		return fmt.Errorf("key %s not found", key)
-	}
-	v.Value = value
-	return nil
-}
-
-func (p *Packet) GameMode() string {
-	v, err := p.Get("game_mode")
-	if err != nil {
-		return "Unknown"
-	}
-	s, ok := gameMode[v.(uint8)]
-	if !ok {
-		return "Unknown"
+		return "unknown"
 	}
 	return s
 }
 
 func (p *Packet) Location() string {
-	v, err := p.Get("location_id")
-	if err != nil {
-		return "Unknown"
-	}
-	s, ok := locations[v.(uint16)]
+	s, ok := locations[p.LocationID]
 	if !ok {
-		return "Unknown"
+		return "unknown"
 	}
 	return s
 }
 
 func (p *Packet) Route() string {
-	v, err := p.Get("route_id")
-	if err != nil {
-		return "Unknown"
-	}
-	s, ok := routes[v.(uint16)]
+	s, ok := routes[p.RouteID]
 	if !ok {
-		return "Unknown"
+		return "unknown"
 	}
 	return s
 }
 
 func (p *Packet) Vehicle() string {
-	v, err := p.Get("vehicle_id")
-	if err != nil {
-		return "Unknown"
-	}
-	s, ok := vehicles[v.(uint16)]
+	s, ok := vehicles[p.VehicleID]
 	if !ok {
-		return "Unknown"
+		return "unknown"
 	}
 	return s
 }
 
 func (p *Packet) VehicleClass() string {
-	v, err := p.Get("vehicle_class_id")
-	if err != nil {
-		return "Unknown"
-	}
-	s, ok := vehicleClasses[v.(uint16)]
+	s, ok := vehicleClasses[p.VehicleClassID]
 	if !ok {
-		return "Unknown"
+		return "unknown"
 	}
 	return s
 }
+
 func (p *Packet) VehicleManufacturer() string {
-	v, err := p.Get("vehicle_manufacturer_id")
-	if err != nil {
-		return "Unknown"
-	}
-	s, ok := vehicleManufacturers[v.(uint16)]
+	s, ok := vehicleManufacturers[p.VehicleManufacturerID]
 	if !ok {
-		return "Unknown"
+		return "unknown"
 	}
 	return s
 }
@@ -415,25 +645,30 @@ const (
 )
 
 func (p *Packet) VehicleTyreState(pos Position) string {
-	v, err := p.Get("vehicle_tyre_state" + string(pos))
-	if err != nil {
-		return "Unknown"
+	v := uint8(0)
+	switch pos {
+	default:
+		return "unknown"
+	case ForwardLeft:
+		v = p.VehicleTyreStateFl
+	case ForwardRight:
+		v = p.VehicleTyreStateFr
+	case BackwordLeft:
+		v = p.VehicleTyreStateBl
+	case BackwordRight:
+		v = p.VehicleTyreStateBr
 	}
-	s, ok := vehicleTyreStates[v.(uint8)]
+	s, ok := vehicleTyreStates[v]
 	if !ok {
-		return "Unknown"
+		return "unknown"
 	}
 	return s
 }
 
-func (p *Packet) StageResultStatus() string {
-	v, err := p.Get("stage_result_status")
-	if err != nil {
-		return "Unknown"
-	}
-	s, ok := stageResultStatus[v.(uint8)]
+func (p *Packet) StageResultStatusString() string {
+	s, ok := stageResultStatus[p.StageResultStatus]
 	if !ok {
-		return "Unknown"
+		return "unknown"
 	}
 	return s
 }
