@@ -116,11 +116,15 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	WrcRoot = filepath.Join(doc, "My Games", "WRC", "telemetry")
+	WrcRoot = filepath.Join(doc, "My Games", "WRC")
+	v, ok := os.LookupEnv("EASPORTSWRC_DOC_ROOT")
+	if ok {
+		WrcRoot = v
+	}
 	if _, err := os.Stat(WrcRoot); err != nil {
 		log.Fatal(err)
 	}
-	ib, err := ReadFileUTF16(filepath.Join(WrcRoot, "readme", "ids.json"))
+	ib, err := ReadFileUTF16(filepath.Join(WrcRoot, "telemetry", "readme", "ids.json"))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -152,7 +156,7 @@ func init() {
 	for _, v := range idjson.StageResultStatus {
 		stageResultStatus[uint8(v.ID)] = v.Name
 	}
-	cb, err := os.ReadFile(filepath.Join(WrcRoot, "readme", "channels.json"))
+	cb, err := os.ReadFile(filepath.Join(WrcRoot, "telemetry", "readme", "channels.json"))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -163,7 +167,7 @@ func init() {
 	for _, ch := range chdefs.Channels {
 		ChannelDicts[ch.ID] = ch
 	}
-	conf, err := os.ReadFile(filepath.Join(WrcRoot, "config.json"))
+	conf, err := os.ReadFile(filepath.Join(WrcRoot, "telemetry", "config.json"))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -172,7 +176,7 @@ func init() {
 		log.Fatal(err)
 	}
 	name := config.UDP.Packets[0].Structure
-	pb, err := os.ReadFile(filepath.Join(WrcRoot, "udp", name+".json"))
+	pb, err := os.ReadFile(filepath.Join(WrcRoot, "telemetry", "udp", name+".json"))
 	if err != nil {
 		log.Fatal(err)
 	}
