@@ -77,8 +77,8 @@ type Packet struct {
 	StageResultTime           float32 `json:"stage_result_time"`
 	StageResultTimePenalty    float32 `json:"stage_result_time_penalty"`
 	StageResultStatus         uint8   `json:"stage_result_status"`
-	StageCurrentDistance      float32 `json:"stage_current_distance"`
-	StageLength               float32 `json:"stage_length"`
+	StageCurrentDistance      float64 `json:"stage_current_distance"`
+	StageLength               float64 `json:"stage_length"`
 	StageProgress             float32 `json:"stage_progress"`
 	VehicleTyreStateBl        uint8   `json:"vehicle_tyre_state_bl"`
 	VehicleTyreStateBr        uint8   `json:"vehicle_tyre_state_br"`
